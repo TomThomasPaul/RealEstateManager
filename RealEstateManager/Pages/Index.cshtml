@@ -1,0 +1,319 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+
+
+<div class="d-flex flex-row flex-sm-wrap">
+
+    <div id="search_view_listings" class="border border-info mb-5 mt-5">
+
+        <form>
+            <div class="form-group flex flex-row">
+                <input type="text" class="border rounded" id="searchList" placeholder="Find Listing..." />
+                <span class="badge badge-info ml-5">You can View/Delete/Update listings here</span>
+            </div>
+
+        </form>
+        <div>
+            <table class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th scope="col">ListingName</th>
+                        <th scope="col">ListingPrice</th>
+                        <th scope="col">Availability</th>
+                        <th scope="col">PostedDate</th>
+                        <th scope="col">Area</th>
+                    </tr>
+                </thead>
+                <tbody class="listings-display">
+                </tbody>
+            </table>
+
+        </div>
+
+
+    </div>
+
+
+
+    <div>
+        <label class="display-4">Create Listings</label>
+        <table class="table table-success  table-bordered">
+            <thead>
+                <tr>
+                    <th scope="col">ListingName</th>
+                    <th scope="col">ListingPrice</th>
+                    <th scope="col">PostedDate</th>
+                    <th scope="col">Area</th>
+                </tr>
+            </thead>
+            <tbody class="listings-create">
+                <tr>
+                    <td><input type="text" class="listingName" placeholder="Listing Name" /></td>
+                    <td><input type="text" class="listingPrice" placeholder="Listing Price" /></td>
+                    <td><input type="date" class="postedDate" placeholder="Posted Date" /></td>
+                    <td><input type="text" class="area" placeholder="AreaSqFeet" /></td>
+                    <td><button id="btn-create" class="btn btn-primary">Create Listing</button></td>
+
+                </tr>
+
+            </tbody>
+        </table>
+
+    </div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+@section scripts
+{
+    <script>
+
+
+
+        $(document).ready(function () {
+
+       
+         
+
+           $("#searchList").keyup(function () {
+
+
+               console.log(`${$(this).val()}`);
+               let search = $(this).val();
+               $(".listings-display").empty();
+
+               search && $.ajax({
+
+                   url: "/api/listings?search=" + search,
+                   dataType: "json",
+                   contentType: "application/json",
+                   method: "GET"
+
+
+
+
+
+               }).done(function (listings) {
+
+                   $(".listings-display").empty();
+
+                   //console.log(listings);
+                   if (listings && listings.length > 0) {
+                       listings.forEach(listing => {
+                           //console.log(listing);
+
+                           $(".listings-display").append(`<tr id="listing-${listing.id}"">
+                            <th scope="row">${listing.listingName}</th>
+                            <td>${listing.listingPrice}</td>
+                            <td class="checkbox"><input type="checkbox" ${listing.isAvailable ? `checked = "checked"` : ""} id="availability-${listing.id}" disabled="true"/></td>
+                            <td>${listing.postedDate}</td>
+                            <td>${listing.areaSqFt}</td>
+                            <td><button id="btn-delete-${listing.id}" class="btn btn-danger">Delete Listing</button>  <button id="btn-update-${listing.id}" class="btn btn-warning">Edit</button></td>
+                            </tr>`)
+
+
+                       })
+
+                      
+                   }
+
+                  
+
+                   $(":button").click(function () {
+
+                       
+
+                       if ($(this).attr("id").split("-")[1] == "delete") {
+                           let id =   $(this).attr("id").split("-")[2];
+                           let listingId = "listing-" + id;
+
+                           $(`#${listingId}`).remove(); //remove from the page
+
+                           //remove from database
+                           $.ajax({
+
+                               url: "/api/listings/" + id,
+                               dataType: "json",
+                               contentType: "application/json",
+                               method: "DELETE"
+                               
+
+
+                           }).done(function (response) {
+
+                               console.log("deleted successfully");
+
+                           }).fail(function (errormsg) {
+                               alert(`There was an error on delete: ${errormsg}`)
+
+                           })
+
+                       }
+                       //update availability
+                       if ($(this).attr("id").split("-")[1] == "update") {
+
+                          
+                           let id = $(this).attr("id").split("-")[2];
+                           let listingId = "listing-" + id;
+                           console.log(listingId);
+
+                           console.log($(".listings-display").find(`#${listingId}`).find(".checkbox").find(`#availability-${id}`).is(":checked"));
+                           let checkBoxTableCell = $(".listings-display").find(`#${listingId}`).find(".checkbox");
+                           let availabilityCheckBox = $(".listings-display").find(`#${listingId}`).find(".checkbox").find(`#availability-${id}`)
+                           if (availabilityCheckBox.attr("disabled")) {
+                               availabilityCheckBox.removeAttr("disabled");
+                               $(`#btn-update-${id}`).text("Update Availability Checkbox- Sold/Available");
+                               
+
+                           } else {
+                               availabilityCheckBox.attr("disabled", "true");
+                              
+                               $(`#btn-update-${id}`).text("Edit");
+                               console.log($(".listings-display").find(`#${listingId}`).find("th")[0].innerHTML);
+                               let updatedListing = {
+
+                                   id : parseInt(id),
+                                   listingName: $(".listings-display").find(`#${listingId}`).find("th")[0].innerHTML,
+                                   listingPrice: parseFloat($(".listings-display").find(`#${listingId}`).find("td")[0].innerHTML),
+                                   isAvailable: $(".listings-display").find(`#${listingId}`).find(".checkbox").find(`#availability-${id}`).is(":checked"),
+                                   //posteddate: new date($(".listings-create").find("tr").find(".posteddate").val()).toisostring(),
+                                   postedDate: $(".listings-display").find(`#${listingId}`).find("td")[2].innerHTML,
+                                   areaSqft: parseFloat($(".listings-display").find(`#${listingId}`).find("td")[3].innerHTML)
+
+
+                               };
+
+                            
+                               console.log(updatedListing);
+
+                               $.ajax({
+
+                                   url: "/api/listings/" + id,
+                                   dataType: "json",
+                                   contentType: "application/json",
+                                   data: JSON.stringify(updatedListing),
+                                   method: "PUT"
+
+
+
+                               }).done(function (response) {
+
+                                   alert("Updated Availability");
+
+                               }).fail(function (errormsg) {
+                                   alert(`There was an error on Update : ${errormsg}`)
+
+                               })
+
+
+
+                           }
+
+                           
+
+                           
+
+
+                       }
+                       
+
+                   })
+
+
+
+               }).fail(function (errorMsg) {
+
+                   alert(`There was an error retrieving data from Server: ${errorMsg}`);
+
+
+
+               })
+
+
+
+
+
+
+
+           })
+    
+         
+        
+
+           //create listing functionality
+
+           $("#btn-create").click(function () {
+
+               console.log($(".listings-create").find("tr").find(".listingName").val());
+               
+
+               let newListing = {
+
+                   listingName: $(".listings-create").find("tr").find(".listingName").val(),
+                   listingPrice: parseFloat($(".listings-create").find("tr").find(".listingPrice").val()),
+                   isAvailable: true,
+                   postedDate: $(".listings-create").find("tr").find(".postedDate").val(),
+                   areaSqFt: parseFloat($(".listings-create").find("tr").find(".area").val())
+
+
+               };
+
+               $.ajax({
+                   url: "/api/listings",
+                   dataType: "json",
+                   contentType: "application/json",
+                   data: JSON.stringify(newListing),
+                   method: "POST"
+
+
+
+
+               }).done(function (listing) {
+                   console.log(listing);
+                 
+                   //$(".listings-display").append(`<tr id="listing-${listing.id}"">
+                   //         <th scope="row">${listing.listingname}</th>
+                   //         <td>${listing.listingprice}</td>
+                   //         <td class="checkbox"><input type="checkbox" checked="checked" id="availability-${listing.id}" disabled="true"/></td>
+                   //         <td>${listing.posteddate}</td>
+                   //         <td>${listing.areasqft}</td>
+                   //         <td><td><button id="btn-delete-${listing.id}" class="btn btn-danger">Delete Listing</button>  <button id="btn-update-${listing.id}" class="btn btn-warning">Edit</button></td></td>
+                   //         </tr>`)
+
+                   alert(` A new record for ${listing.listingName} has been created successfully`);
+
+               
+
+
+              
+
+               }).fail(function (error) {
+                   alert(`error while creating a listing: ${JSON.stringify(error.responseJSON.errors)}`);
+                   console.log(error);
+                  
+
+
+               })
+
+
+           })
+
+       })
+
+
+    </script>
+
+
+}
